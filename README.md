@@ -1,5 +1,86 @@
 # HackerRank Orchestrate - October 2026
 
+## Implemented auditor: setup, validation, and current limits
+
+The implementation is in `code/`. It produces a **candidate** `output.csv` using
+only participant-facing evidence. It has not achieved perfect public-sample
+sequence accuracy and must not be represented as a guaranteed full-score or
+production-certified solution. See `code/evaluation/evaluation_report.md` for
+measured accuracy and case-level failures.
+
+The generated review in `code/evaluation/failure_analysis.md` identifies resource
+IDs required by public answers that do not occur in the prediction inputs.
+The implementation uses the supplied dataset only and does not fill these gaps
+from answer labels. General correctness fixes cover explicit source lineage,
+per-replica state, identity cutoffs, tombstone references, and attachment policy.
+
+Requires Python 3.11+ and the PDF dependency:
+
+```text
+python -m venv .venv
+```
+
+Activate the environment (`.venv\Scripts\Activate.ps1` on Windows, or
+`source .venv/bin/activate` on macOS/Linux), then run:
+
+```text
+python -m pip install -r code/requirements.txt
+python code/main.py
+python -m unittest discover -s code -p test_audit.py -v
+python code/evaluation/main.py
+python code/package.py
+```
+
+Windows screenshot extraction uses the installed Windows OCR language model
+through `Windows.Media.Ocr`. It requires an OCR language pack and access to the
+OS OCR service. On macOS/Linux, install Tesseract and ensure `tesseract` is on
+PATH. To select a different executable, set `AUDIT_TESSERACT_CMD` in the process
+environment. No credentials or network model calls are needed. Do not commit
+`.env` files. No machine-specific paths are embedded in source.
+
+Input and output paths are relative to the repository, regardless of the shell's
+working directory. CLI overrides: `--dataset`, `--requests`, `--output`, `--cache`.
+PDF/OCR text is cached by source SHA-256 in `.cache/extracted/`; the cache is
+excluded from submission packaging. A cold run re-extracts all 94 manifest
+artifacts; it never needs cached predictions or public answer files.
+
+For safety-critical use, run `python code/main.py --strict-coverage`. This fails
+before replacing the output when account coverage or resource state is uncertain.
+An attributed resource with no admissible state readback fails in either mode.
+The default challenge command emits candidate answers for discovered resources
+and records coverage/state warnings in `.cache/run_summary.json` and the
+evaluation report. A COMPLETE candidate with a coverage warning is **not** a
+deletion certificate. An observed backup without a restore-permission readback
+receives a conservative block-and-verify plan without an invented risk finding.
+
+The pipeline separates exact current/historical identity matching, evidence
+adapters, temporal state reconstruction, policy planning, output validation, and
+evaluation. Activity results never establish successful deletion. SQL runs only
+in an isolated in-memory SQLite database with file attachment and file functions
+denied. Output is validated before an atomic replacement. Steps use the exact
+operation/system/resource order required by the problem statement.
+
+Artifacts are read once and indexed in memory; the supplied dataset runs in a
+few seconds with a warm extraction cache. This is an extensible audit engine,
+not an enterprise deployment. Larger deployments need persistent temporal
+indexes, inventory completeness attestations, authoritative subject lineage,
+policy-condition adapters, stronger OCR/layout interpretation, and review of
+unresolved evidence. Runtime inference is deterministic; AI-assisted screenshot
+extraction uses local OCR. No generative language model is used in the current
+runtime. Development model usage is separate from runtime usage.
+
+`code/package.py` checks that source, all prediction inputs, public evaluation
+inputs, output, and report fingerprints
+match the recorded full run before creating `code.zip` from an explicit
+allowlist and verifying its contents. Failed or unrecorded regression tests block packaging.
+The evaluator regenerates the forensic failure analysis and before/after comparison;
+`baseline_metrics.md` preserves the original measured aggregates. It includes reports in both `code/evaluation/` (README layout) and
+`evaluation/` (problem-statement layout). It excludes datasets, generated
+predictions, caches, credentials, transcripts, and nested archives. Upload root
+`log.txt` separately as the chat transcript. The additional raw agent trace
+requested by `agent_trace_instructions.md` must be finalized after this session
+has ended and the app has flushed its trace; see `code/TRACE_EXPORT.md`.
+
 ## Ghost Data Still Exists
 
 Build an AI agent that audits whether a user's personal data was actually deleted.
